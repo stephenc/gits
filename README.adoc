@@ -1,0 +1,66 @@
+= Gits
+
+> Makes messing up across multiple git repositories easier.
+
+== Problem statement
+
+You have multiple git repositories and you want to make changes to them at the same time.
+
+== Example
+
+Typically you have all your repos checked out in the same directory.
+
+You start by making the code changes in the repos that need to be modified.
+
+Now you give all the dirty repos a common branch name, e.g. `bugfix-123`
+
+[source, bash]
+----
+$ gits -dirty git checkout -b bugfix-123
+----
+
+Next you want to commit all the changes on the repos that are on that branch :
+
+[source, bash]
+----
+$ gits -branch bugfix-123 git commit -a -m "fix: bug 123"
+----
+
+Then you want to push all those branches...
+
+[source, bash]
+----
+$ gits -branch bugfix-123 git push -u origin bugfix-123
+----
+
+And then create pull requests, assigning a specific (unlucky) reviewer, e.g. `victim123`
+
+[source, bash]
+----
+$ gits -branch bugfix-123 gh pr create --fill-first -r victim123
+----
+
+== Installation
+
+[source,bash]
+----
+$ go install github.com/stephenc/gits@latest
+----
+
+To see the available options use `gits -help`
+
+[source,bash]
+----
+$ gits -help
+Usage: gits [options] command [args...]
+  -branch string
+    	only match repositories on this branch
+  -clean
+    	only match repositories with a clean worktree
+  -dirty
+    	only match repositories with a dirty worktree
+  -help
+    	display help message
+  -parallel int
+    	number of parallel tasks (default 12)
+----
