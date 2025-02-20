@@ -54,13 +54,17 @@ To see the available options use `gits -help`
 $ gits -help
 Usage: gits [options] command [args...]
   -branch string
-    	only match repositories on this branch
+        only match repositories on this branch
   -clean
-    	only match repositories with a clean worktree
+        only match repositories with a clean worktree
   -dirty
-    	only match repositories with a dirty worktree
+        only match repositories with a dirty worktree
   -help
-    	display help message
+        display help message
   -parallel int
-    	number of parallel tasks (default 12)
+        number of parallel tasks (default 12)
+  -stash
+        only match repositories with stashed changes
+  -status
+        display a summary of branch statuses and exit
 ----
