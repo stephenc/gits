@@ -85,6 +85,27 @@ func isClean(path string) (bool, error) {
 	return len(out) == 0, nil
 }
 
+func getStashCount(path string) (int, error) {
+	cmd := exec.Command("git", "-C", path, "stash", "list", "--format=%h")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	if err := cmd.Run(); err != nil {
+		return 0, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		return 0, nil // No stashes
+	}
+	return len(lines), nil
+}
+
+func isStash(path string) (bool, error) {
+	count, err := getStashCount(path)
+	return count > 0, err
+}
+
 type RemoteSyncState int
 
 const (
@@ -185,6 +206,11 @@ func statusRepo(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, wid
 		clean = false
 	}
 
+	stashes, err := getStashCount(path)
+	if err != nil {
+		stashes = 0
+	}
+
 	localBranches, err := getLocalBranches(path)
 	localBranches = slices.DeleteFunc(localBranches, func(x string) bool { return x == currentBranch })
 	sort.Strings(localBranches)
@@ -201,6 +227,9 @@ func statusRepo(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, wid
 	var status strings.Builder
 	if !clean {
 		status.WriteString("📝")
+	}
+	if stashes > 0 {
+		status.WriteString(strings.Repeat("🥖", stashes))
 	}
 	switch remoteSync {
 	case BehindRemote:
@@ -233,6 +262,7 @@ func main() {
 	branch := flag.String("branch", "", "only match repositories on this branch")
 	dirty := flag.Bool("dirty", false, "only match repositories with a dirty worktree")
 	clean := flag.Bool("clean", false, "only match repositories with a clean worktree")
+	stash := flag.Bool("stash", false, "only match repositories with stashed changes")
 	help := flag.Bool("help", false, "display help message")
 	status := flag.Bool("status", false, "display a summary of branch statuses and exit")
 	flag.Parse()
@@ -258,6 +288,10 @@ func main() {
 
 	if *clean {
 		filters = append(filters, isClean)
+	}
+
+	if *stash {
+		filters = append(filters, isStash)
 	}
 
 	var applyAction func(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, results *[]string, finalExitCode *int)
