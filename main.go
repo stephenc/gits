@@ -343,7 +343,13 @@ func main() {
 	quiet := flag.Bool("quiet", false, "suppress output from repositories where the command succeeded")
 	help := flag.Bool("help", false, "display help message")
 	status := flag.Bool("status", false, "display a summary of branch statuses and exit")
+	showVersion := flag.Bool("version", false, "display the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("gits " + versionString())
+		os.Exit(0)
+	}
 
 	if *help {
 		fmt.Println("Usage: gits [options] command [args...]")

@@ -1,1 +1,4 @@
 .idea/
+# The binary that `go build` writes beside the source.
+/gits
+/gits.exe

@@ -19,7 +19,7 @@ Now you give all the dirty repos a common branch name, e.g. `bugfix-123`
 $ gits -dirty git checkout -b bugfix-123
 ----
 
-Next you want to commit all the changes on the repos that are on that branch :
+Next you want to commit all the changes on the repos that are on that branch:
 
 [source, bash]
 ----
@@ -58,6 +58,9 @@ $ gits -remote-contains stephenc git pull
 $ gits -remote-host github.com git pull
 $ gits -remote-name upstream git fetch upstream
 ----
+
+*NOTE:* By default all commands are run in parallel with the default paralellisation scaled to your machine's available cores.
+Output when running in parallel mode is batched by repository with failures reported at the end so that they are easier to find.
 
 == Installation
 
