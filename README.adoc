@@ -16,51 +16,80 @@ Now you give all the dirty repos a common branch name, e.g. `bugfix-123`
 
 [source, bash]
 ----
-$ gits -dirty git checkout -b bugfix-123
+$ gits --dirty git checkout -b bugfix-123
 ----
 
 Next you want to commit all the changes on the repos that are on that branch:
 
 [source, bash]
 ----
-$ gits -branch bugfix-123 git commit -a -m "fix: bug 123"
+$ gits --branch bugfix-123 git commit -a -m "fix: bug 123"
 ----
 
 Then you want to push all those branches...
 
 [source, bash]
 ----
-$ gits -branch bugfix-123 git push -u origin bugfix-123
+$ gits --branch bugfix-123 git push -u origin bugfix-123
 ----
 
 And then create pull requests, assigning a specific (unlucky) reviewer, e.g. `victim123`
 
 [source, bash]
 ----
-$ gits -branch bugfix-123 gh pr create --fill-first -r victim123
+$ gits --branch bugfix-123 gh pr create --fill-first -r victim123
 ----
 
 If you have a lot of repos, the output from the ones where the command succeeded can drown out the failures.
-The `-quiet` flag keeps the per-repo status line but suppresses the command output for repos where the command exited with code 0:
+The `--quiet` flag keeps the per-repo status line but suppresses the command output for repos where the command exited with code 0:
 
 [source, bash]
 ----
-$ gits -quiet git fetch
+$ gits --quiet git fetch
 ----
 
-You can also filter repos by their remotes, e.g. only repos with at least one remote (`-remote`), only repos with no remotes (`-no-remote`), only repos with a remote URL containing a substring (`-remote-contains`), only repos with a remote on a given host (`-remote-host`), or only repos with a remote of a given name (`-remote-name`):
+You can also filter repos by their remotes, e.g. only repos with at least one remote (`--remote`), only repos with no remotes (`--no-remote`), only repos with a remote URL containing a substring (`--remote-contains`), only repos with a remote on a given host (`--remote-host`), or only repos with a remote of a given name (`--remote-name`):
 
 [source, bash]
 ----
-$ gits -remote git fetch
-$ gits -no-remote -status
-$ gits -remote-contains stephenc git pull
-$ gits -remote-host github.com git pull
-$ gits -remote-name upstream git fetch upstream
+$ gits --remote git fetch
+$ gits --no-remote status
+$ gits --remote-contains stephenc git pull
+$ gits --remote-host github.com git pull
+$ gits --remote-name upstream git fetch upstream
+----
+
+Or by the repo's directory name, e.g. only repos whose name contains a substring (`--name-contains`), starts with a prefix (`--name-starts`), or ends with a suffix (`--name-ends`):
+
+[source, bash]
+----
+$ gits --name-contains widget git pull
+$ gits --name-starts frontend- status
+$ gits --name-ends -api git fetch
 ----
 
 *NOTE:* By default all commands are run in parallel with the default paralellisation scaled to your machine's available cores.
 Output when running in parallel mode is batched by repository with failures reported at the end so that they are easier to find.
+
+== Subcommands
+
+`gits` has four subcommands: `completion`, `help`, `status`, and `version`.
+The `status` and `version` subcommands are also available as the `--status` and `--version` flags, and `completion` generates a shell completion script for bash, zsh, fish, or powershell:
+
+[source, bash]
+----
+$ gits status --dirty
+$ gits version
+$ gits completion zsh
+----
+
+Any other first argument is treated as the command to run in each repository, so `gits gh pr list` just works.
+If you actually want to run a command named `completion`, `help`, `status`, or `version` in each repository, put it after `--`:
+
+[source, bash]
+----
+$ gits -- version
+----
 
 == Installation
 
@@ -69,36 +98,48 @@ Output when running in parallel mode is batched by repository with failures repo
 $ go install github.com/stephenc/gits@latest
 ----
 
-To see the available options use `gits -help`
+To see the available options use `gits help`
 
 [source,bash]
 ----
-$ gits -help
-Usage: gits [options] command [args...]
-  -branch string
-        only match repositories on this branch
-  -clean
-        only match repositories with a clean worktree
-  -dirty
-        only match repositories with a dirty worktree
-  -help
-        display help message
-  -no-remote
-        only match repositories with no remotes
-  -parallel int
-        number of parallel tasks (default 12)
-  -quiet
-        suppress output from repositories where the command succeeded
-  -remote
-        only match repositories with at least one remote
-  -remote-contains string
-        only match repositories with a remote URL containing this substring
-  -remote-host string
-        only match repositories with a remote on this host
-  -remote-name string
-        only match repositories with a remote of this name
-  -stash
-        only match repositories with stashed changes
-  -status
-        display a summary of branch statuses and exit
+$ gits help
+gits walks the current directory for git repositories, optionally narrows
+them down with filter flags, and runs the given command in each of them in
+parallel.
+
+Any command that is not a gits subcommand is run as-is in each repository, so
+"gits gh pr list" just works. To run a command that shares a name with a
+subcommand (completion, help, status, version), put it after "--":
+"gits -- version".
+
+Usage:
+  gits [flags] command [args...]
+  gits [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  status      Display a summary of branch statuses
+  version     Display the version
+
+Flags:
+      --branch string            only match repositories on this branch
+      --clean                    only match repositories with a clean worktree
+      --dirty                    only match repositories with a dirty worktree
+  -h, --help                     help for gits
+      --name-contains string     only match repositories whose directory name contains this substring
+      --name-ends string         only match repositories whose directory name ends with this suffix
+      --name-starts string       only match repositories whose directory name starts with this prefix
+      --no-remote                only match repositories with no remotes
+      --parallel int             number of parallel tasks (default 12)
+      --quiet                    suppress output from repositories where the command succeeded
+      --remote                   only match repositories with at least one remote
+      --remote-contains string   only match repositories with a remote URL containing this substring
+      --remote-host string       only match repositories with a remote on this host
+      --remote-name string       only match repositories with a remote of this name
+      --stash                    only match repositories with stashed changes
+      --status                   display a summary of branch statuses and exit
+      --version                  display the version and exit
+
+Use "gits [command] --help" for more information about a command.
 ----
