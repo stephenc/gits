@@ -17,9 +17,9 @@ import (
 	"github.com/stephenc/gits/internal/git"
 )
 
-// findGitRepos walks the current working directory and returns the git
+// Discover walks the current working directory and returns the git
 // repositories that pass every filter, sorted by path.
-func findGitRepos(filters []filter.Filter) (repos []string, cwd string, err error) {
+func Discover(filters []filter.Filter) (repos []string, cwd string, err error) {
 	cwd, err = os.Getwd()
 	if err != nil {
 		return nil, "", fmt.Errorf("error getting current working directory: %w", err)
@@ -208,7 +208,7 @@ func forEachRepo(repos []string, parallel int, action func(path string) (string,
 // RunAcross runs command in every matching repository and returns the exit
 // code the process should finish with.
 func RunAcross(filters []filter.Filter, parallel int, quiet bool, command []string) int {
-	repos, cwd, err := findGitRepos(filters)
+	repos, cwd, err := Discover(filters)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -222,7 +222,7 @@ func RunAcross(filters []filter.Filter, parallel int, quiet bool, command []stri
 // RunStatus prints a branch status summary for every matching repository and
 // returns the exit code the process should finish with.
 func RunStatus(filters []filter.Filter, parallel int) int {
-	repos, cwd, err := findGitRepos(filters)
+	repos, cwd, err := Discover(filters)
 	if err != nil {
 		fmt.Println(err)
 		return 1

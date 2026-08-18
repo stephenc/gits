@@ -230,3 +230,62 @@ func RunCommand(path string, command []string) (string, int) {
 	}
 	return out.String(), exitCode
 }
+
+// HeadBranch reads the current branch of the repository at path straight from
+// .git/HEAD, without running git. It returns "" for a detached HEAD. Shell
+// completion calls this once per repository, so it must stay exec-free.
+func HeadBranch(path string) string {
+	data, err := os.ReadFile(filepath.Join(path, ".git", "HEAD"))
+	if err != nil {
+		return ""
+	}
+	head := strings.TrimSpace(string(data))
+	if branch, ok := strings.CutPrefix(head, "ref: refs/heads/"); ok {
+		return branch
+	}
+	return "" // detached HEAD
+}
+
+// ConfigRemotes reads the remotes of the repository at path straight from
+// .git/config, without running git, returning remote names and URLs. Shell
+// completion calls this once per repository, so it must stay exec-free.
+func ConfigRemotes(path string) (names []string, urls []string) {
+	data, err := os.ReadFile(filepath.Join(path, ".git", "config"))
+	if err != nil {
+		return nil, nil
+	}
+
+	inRemote := false
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[") {
+			rest, ok := strings.CutPrefix(line, `[remote "`)
+			if !ok {
+				inRemote = false
+				continue
+			}
+			name, ok := strings.CutSuffix(rest, `"]`)
+			if !ok {
+				inRemote = false
+				continue
+			}
+			inRemote = true
+			if !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+			continue
+		}
+		if !inRemote {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(key) != "url" {
+			continue
+		}
+		url := strings.TrimSpace(value)
+		if url != "" && !slices.Contains(urls, url) {
+			urls = append(urls, url)
+		}
+	}
+	return names, urls
+}

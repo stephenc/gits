@@ -83,6 +83,9 @@ $ gits version
 $ gits completion zsh
 ----
 
+With completions installed, the filter flags complete their values from the repositories below the current directory: `--branch` offers the currently checked out branches, `--name-contains`/`--name-starts`/`--name-ends` offer the repo directory names, and `--remote-name`/`--remote-host`/`--remote-contains` offer the remote names, hosts, and URLs.
+The candidates are gathered by parsing the `.git` files directly, so completion stays fast even across many repositories.
+
 Any other first argument is treated as the command to run in each repository, so `gits gh pr list` just works.
 If you actually want to run a command named `completion`, `help`, `status`, or `version` in each repository, put it after `--`:
 

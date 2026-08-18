@@ -142,6 +142,8 @@ subcommand (completion, help, status, version), put it after "--":
 
 	root.AddCommand(newStatusCmd(opts), newVersionCmd())
 
+	registerFilterCompletions(root)
+
 	return root
 }
 
