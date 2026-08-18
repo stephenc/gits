@@ -40,6 +40,25 @@ And then create pull requests, assigning a specific (unlucky) reviewer, e.g. `vi
 $ gits -branch bugfix-123 gh pr create --fill-first -r victim123
 ----
 
+If you have a lot of repos, the output from the ones where the command succeeded can drown out the failures.
+The `-quiet` flag keeps the per-repo status line but suppresses the command output for repos where the command exited with code 0:
+
+[source, bash]
+----
+$ gits -quiet git fetch
+----
+
+You can also filter repos by their remotes, e.g. only repos with at least one remote (`-remote`), only repos with no remotes (`-no-remote`), only repos with a remote URL containing a substring (`-remote-contains`), only repos with a remote on a given host (`-remote-host`), or only repos with a remote of a given name (`-remote-name`):
+
+[source, bash]
+----
+$ gits -remote git fetch
+$ gits -no-remote -status
+$ gits -remote-contains stephenc git pull
+$ gits -remote-host github.com git pull
+$ gits -remote-name upstream git fetch upstream
+----
+
 == Installation
 
 [source,bash]
@@ -61,8 +80,20 @@ Usage: gits [options] command [args...]
         only match repositories with a dirty worktree
   -help
         display help message
+  -no-remote
+        only match repositories with no remotes
   -parallel int
         number of parallel tasks (default 12)
+  -quiet
+        suppress output from repositories where the command succeeded
+  -remote
+        only match repositories with at least one remote
+  -remote-contains string
+        only match repositories with a remote URL containing this substring
+  -remote-host string
+        only match repositories with a remote on this host
+  -remote-name string
+        only match repositories with a remote of this name
   -stash
         only match repositories with stashed changes
   -status

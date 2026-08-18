@@ -106,6 +106,73 @@ func isStash(path string) (bool, error) {
 	return count > 0, err
 }
 
+func getRemoteURLs(path string) ([]string, error) {
+	cmd := exec.Command("git", "-C", path, "remote", "-v")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var urls []string
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		if !slices.Contains(urls, fields[1]) {
+			urls = append(urls, fields[1])
+		}
+	}
+	return urls, nil
+}
+
+func getRemoteNames(path string) ([]string, error) {
+	cmd := exec.Command("git", "-C", path, "remote")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		names = append(names, line)
+	}
+	return names, nil
+}
+
+func remoteHost(rawURL string) string {
+	if i := strings.Index(rawURL, "://"); i >= 0 {
+		host := rawURL[i+3:]
+		if j := strings.Index(host, "/"); j >= 0 {
+			host = host[:j]
+		}
+		if j := strings.LastIndex(host, "@"); j >= 0 {
+			host = host[j+1:]
+		}
+		if j := strings.Index(host, ":"); j >= 0 {
+			host = host[:j]
+		}
+		return host
+	}
+	// scp-like syntax: [user@]host:path
+	if j := strings.Index(rawURL, ":"); j >= 0 {
+		host := rawURL[:j]
+		if k := strings.Index(host, "@"); k >= 0 {
+			host = host[k+1:]
+		}
+		return host
+	}
+	return "" // local path, no host
+}
+
 type RemoteSyncState int
 
 const (
@@ -156,7 +223,7 @@ func runCommand(path string, command []string) (string, int) {
 
 type filter func(path string) (bool, error)
 
-func processRepo(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, command []string, results *[]string, finalExitCode *int) {
+func processRepo(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, command []string, quiet bool, results *[]string, finalExitCode *int) {
 	defer wg.Done()
 
 	// Run the command
@@ -171,7 +238,12 @@ func processRepo(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, co
 		*finalExitCode = 1
 	}
 
-	result := fmt.Sprintf("\033[1m%s %s:\033[0m\n  %s", status, relPath, strings.ReplaceAll(output, "\n", "\n  "))
+	var result string
+	if quiet && exitCode == 0 {
+		result = fmt.Sprintf("\033[1m%s %s\033[0m", status, relPath)
+	} else {
+		result = fmt.Sprintf("\033[1m%s %s:\033[0m\n  %s", status, relPath, strings.ReplaceAll(output, "\n", "\n  "))
+	}
 
 	mu.Lock()
 	*results = append(*results, result)
@@ -263,6 +335,12 @@ func main() {
 	dirty := flag.Bool("dirty", false, "only match repositories with a dirty worktree")
 	clean := flag.Bool("clean", false, "only match repositories with a clean worktree")
 	stash := flag.Bool("stash", false, "only match repositories with stashed changes")
+	remote := flag.Bool("remote", false, "only match repositories with at least one remote")
+	noRemote := flag.Bool("no-remote", false, "only match repositories with no remotes")
+	remoteContains := flag.String("remote-contains", "", "only match repositories with a remote URL containing this substring")
+	remoteHostname := flag.String("remote-host", "", "only match repositories with a remote on this host")
+	remoteName := flag.String("remote-name", "", "only match repositories with a remote of this name")
+	quiet := flag.Bool("quiet", false, "suppress output from repositories where the command succeeded")
 	help := flag.Bool("help", false, "display help message")
 	status := flag.Bool("status", false, "display a summary of branch statuses and exit")
 	flag.Parse()
@@ -294,6 +372,54 @@ func main() {
 		filters = append(filters, isStash)
 	}
 
+	if *remote {
+		filters = append(filters, func(path string) (bool, error) {
+			urls, err := getRemoteURLs(path)
+			return len(urls) > 0, err
+		})
+	}
+
+	if *noRemote {
+		filters = append(filters, func(path string) (bool, error) {
+			urls, err := getRemoteURLs(path)
+			return len(urls) == 0, err
+		})
+	}
+
+	if *remoteContains != "" {
+		filters = append(filters, func(path string) (bool, error) {
+			urls, err := getRemoteURLs(path)
+			if err != nil {
+				return false, err
+			}
+			return slices.ContainsFunc(urls, func(u string) bool {
+				return strings.Contains(u, *remoteContains)
+			}), nil
+		})
+	}
+
+	if *remoteHostname != "" {
+		filters = append(filters, func(path string) (bool, error) {
+			urls, err := getRemoteURLs(path)
+			if err != nil {
+				return false, err
+			}
+			return slices.ContainsFunc(urls, func(u string) bool {
+				return remoteHost(u) == *remoteHostname
+			}), nil
+		})
+	}
+
+	if *remoteName != "" {
+		filters = append(filters, func(path string) (bool, error) {
+			names, err := getRemoteNames(path)
+			if err != nil {
+				return false, err
+			}
+			return slices.Contains(names, *remoteName), nil
+		})
+	}
+
 	var applyAction func(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, results *[]string, finalExitCode *int)
 
 	var gitRepos []string
@@ -323,7 +449,7 @@ func main() {
 		}
 
 		applyAction = func(wg *sync.WaitGroup, mu *sync.Mutex, path string, cwd string, results *[]string, finalExitCode *int) {
-			processRepo(wg, mu, path, cwd, command, results, finalExitCode)
+			processRepo(wg, mu, path, cwd, command, *quiet, results, finalExitCode)
 		}
 	}
 
