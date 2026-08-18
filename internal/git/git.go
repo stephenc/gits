@@ -1,4 +1,6 @@
-package main
+// Package git wraps the git invocations that gits uses to inspect and act on
+// repositories.
+package git
 
 import (
 	"bytes"
@@ -10,13 +12,15 @@ import (
 	"strings"
 )
 
-func isGitRepo(path string) bool {
+// IsRepo reports whether path is the root of a git repository.
+func IsRepo(path string) bool {
 	gitDir := filepath.Join(path, ".git")
 	info, err := os.Stat(gitDir)
 	return err == nil && info.IsDir()
 }
 
-func getCurrentBranch(path string) (string, error) {
+// CurrentBranch returns the branch that the repository at path has checked out.
+func CurrentBranch(path string) (string, error) {
 	cmd := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD")
 	out, err := cmd.Output()
 	if err != nil {
@@ -25,7 +29,9 @@ func getCurrentBranch(path string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func getDefaultBranch(path string) (string, error) {
+// DefaultBranch returns the configured init.defaultbranch, or "main" when
+// nothing is configured.
+func DefaultBranch(path string) (string, error) {
 	cmd := exec.Command("git", "-C", path, "config", "get", "init.defaultbranch")
 	out, err := cmd.Output()
 	if err != nil {
@@ -40,7 +46,9 @@ func getDefaultBranch(path string) (string, error) {
 	return res, nil
 }
 
-func getLocalBranches(path string) ([]string, error) {
+// LocalBranches returns the names of the local branches of the repository at
+// path.
+func LocalBranches(path string) ([]string, error) {
 	cmd := exec.Command("git", "-C", path, "branch", "--format", "%(refname:short)")
 	out, err := cmd.Output()
 	if err != nil {
@@ -61,7 +69,8 @@ func getLocalBranches(path string) ([]string, error) {
 	return res, nil
 }
 
-func isDirty(path string) (bool, error) {
+// IsDirty reports whether the worktree of the repository at path has changes.
+func IsDirty(path string) (bool, error) {
 	cmd := exec.Command("git", "-C", path, "status", "--porcelain")
 	out, err := cmd.Output()
 	if err != nil {
@@ -70,7 +79,8 @@ func isDirty(path string) (bool, error) {
 	return len(out) > 0, nil
 }
 
-func isClean(path string) (bool, error) {
+// IsClean reports whether the worktree of the repository at path has no changes.
+func IsClean(path string) (bool, error) {
 	cmd := exec.Command("git", "-C", path, "status", "--porcelain")
 	out, err := cmd.Output()
 	if err != nil {
@@ -79,7 +89,8 @@ func isClean(path string) (bool, error) {
 	return len(out) == 0, nil
 }
 
-func getStashCount(path string) (int, error) {
+// StashCount returns the number of stashes in the repository at path.
+func StashCount(path string) (int, error) {
 	cmd := exec.Command("git", "-C", path, "stash", "list", "--format=%h")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -95,7 +106,8 @@ func getStashCount(path string) (int, error) {
 	return len(lines), nil
 }
 
-func getRemoteURLs(path string) ([]string, error) {
+// RemoteURLs returns the distinct remote URLs of the repository at path.
+func RemoteURLs(path string) ([]string, error) {
 	cmd := exec.Command("git", "-C", path, "remote", "-v")
 	out, err := cmd.Output()
 	if err != nil {
@@ -119,7 +131,8 @@ func getRemoteURLs(path string) ([]string, error) {
 	return urls, nil
 }
 
-func getRemoteNames(path string) ([]string, error) {
+// RemoteNames returns the names of the remotes of the repository at path.
+func RemoteNames(path string) ([]string, error) {
 	cmd := exec.Command("git", "-C", path, "remote")
 	out, err := cmd.Output()
 	if err != nil {
@@ -137,7 +150,9 @@ func getRemoteNames(path string) ([]string, error) {
 	return names, nil
 }
 
-func remoteHost(rawURL string) string {
+// RemoteHost extracts the host from a remote URL, or returns "" for a local
+// path.
+func RemoteHost(rawURL string) string {
 	if i := strings.Index(rawURL, "://"); i >= 0 {
 		host := rawURL[i+3:]
 		if j := strings.Index(host, "/"); j >= 0 {
@@ -162,6 +177,8 @@ func remoteHost(rawURL string) string {
 	return "" // local path, no host
 }
 
+// RemoteSyncState describes whether a branch is behind, in sync with, or
+// ahead of its remote tracking branch.
 type RemoteSyncState int
 
 const (
@@ -170,7 +187,9 @@ const (
 	AheadRemote  RemoteSyncState = 1
 )
 
-func getRemoteSyncStatus(path string) (RemoteSyncState, error) {
+// RemoteSyncStatus reports whether the current branch of the repository at
+// path is behind, in sync with, or ahead of its remote tracking branch.
+func RemoteSyncStatus(path string) (RemoteSyncState, error) {
 	cmd := exec.Command("git", "-C", path, "status", "--porcelain", "--branch")
 	out, err := cmd.Output()
 	if err != nil {
@@ -192,7 +211,9 @@ func getRemoteSyncStatus(path string) (RemoteSyncState, error) {
 	return SyncRemote, nil
 }
 
-func runCommand(path string, command []string) (string, int) {
+// RunCommand runs command in the directory at path and returns its combined
+// output and exit code.
+func RunCommand(path string, command []string) (string, int) {
 	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Dir = path
 	var out bytes.Buffer

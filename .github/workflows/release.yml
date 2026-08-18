@@ -6,7 +6,7 @@ name: Release
 #
 # The repository holds no version number. The tag holds it, on a commit of
 # `main`, and the build stamps it into the binary with
-# `-ldflags "-X main.version=X.Y.Z"`. A build that nobody stamps — a checkout,
+# `-ldflags "-X github.com/stephenc/gits/internal/version.version=X.Y.Z"`. A build that nobody stamps — a checkout,
 # or `go install github.com/stephenc/gits@vX.Y.Z` — reports what the Go module
 # system recorded instead; see version.go. There is therefore no release
 # commit: making a release changes no file, so a branch ruleset on `main`
@@ -234,7 +234,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # `-X main.version=...` stamps the number into the binary. The number is
+      # `-X github.com/stephenc/gits/internal/version.version=...` stamps the number into the binary. The number is
       # the one that `decide` read from the tag, and the checkout above is the
       # commit that the tag names, so the binary and its number cannot come
       # apart.
@@ -247,7 +247,7 @@ jobs:
         run: |
           bin=gits
           [ "$GOOS" = windows ] && bin=gits.exe
-          go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o "dist/$bin" .
+          go build -trimpath -ldflags="-s -w -X github.com/stephenc/gits/internal/version.version=$VERSION" -o "dist/$bin" .
 
       # The stamp must reach the binary: a renamed variable or a moved package
       # would make `-X` write into nothing, in silence, and every binary of the
@@ -257,7 +257,7 @@ jobs:
       - name: The binary reports the version
         if: matrix.name == 'Linux-x86_64'
         run: |
-          got="$(./dist/gits -version)"
+          got="$(./dist/gits version)"
           echo "$got"
           [ "$got" = "gits ${{ needs.decide.outputs.version }}" ] || {
             echo "the binary reports \`$got\`, and this release is" \

@@ -1,4 +1,6 @@
-package main
+// Package runner discovers the repositories below the current directory and
+// runs work across them in parallel.
+package runner
 
 import (
 	"fmt"
@@ -10,11 +12,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stephenc/gits/internal/filter"
+	"github.com/stephenc/gits/internal/git"
 )
 
 // findGitRepos walks the current working directory and returns the git
 // repositories that pass every filter, sorted by path.
-func findGitRepos(filters []Filter) (repos []string, cwd string, err error) {
+func findGitRepos(filters []filter.Filter) (repos []string, cwd string, err error) {
 	cwd, err = os.Getwd()
 	if err != nil {
 		return nil, "", fmt.Errorf("error getting current working directory: %w", err)
@@ -30,7 +35,7 @@ func findGitRepos(filters []Filter) (repos []string, cwd string, err error) {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() && isGitRepo(path) {
+		if info.IsDir() && git.IsRepo(path) {
 			// Check filters
 			for _, f := range filters {
 				r, err := f.Matches(path)
@@ -57,7 +62,7 @@ func processRepo(path string, cwd string, command []string, quiet bool) (string,
 	if err != nil {
 		relPath = path
 	}
-	output, exitCode := runCommand(path, command)
+	output, exitCode := git.RunCommand(path, command)
 	status := "✅️" // Checkmark
 	if exitCode != 0 {
 		status = "❌" // Cross mark
@@ -75,32 +80,32 @@ func statusRepo(path string, cwd string, width int) string {
 		relPath = path
 	}
 
-	currentBranch, err := getCurrentBranch(path)
+	currentBranch, err := git.CurrentBranch(path)
 	if err != nil {
 		currentBranch = "!" + err.Error()
 	}
 
-	defaultBranch, err := getDefaultBranch(path)
+	defaultBranch, err := git.DefaultBranch(path)
 	if err != nil {
 		defaultBranch = "main"
 	}
 
-	remoteSync, err := getRemoteSyncStatus(path)
+	remoteSync, err := git.RemoteSyncStatus(path)
 	if err != nil {
-		remoteSync = SyncRemote
+		remoteSync = git.SyncRemote
 	}
 
-	clean, err := isClean(path)
+	clean, err := git.IsClean(path)
 	if err != nil {
 		clean = false
 	}
 
-	stashes, err := getStashCount(path)
+	stashes, err := git.StashCount(path)
 	if err != nil {
 		stashes = 0
 	}
 
-	localBranches, _ := getLocalBranches(path)
+	localBranches, _ := git.LocalBranches(path)
 	localBranches = slices.DeleteFunc(localBranches, func(x string) bool { return x == currentBranch })
 	sort.Strings(localBranches)
 
@@ -121,9 +126,9 @@ func statusRepo(path string, cwd string, width int) string {
 		status.WriteString(strings.Repeat("🥖", stashes))
 	}
 	switch remoteSync {
-	case BehindRemote:
+	case git.BehindRemote:
 		status.WriteString("😰")
-	case AheadRemote:
+	case git.AheadRemote:
 		status.WriteString("🏎💨")
 	}
 
@@ -200,22 +205,24 @@ func forEachRepo(repos []string, parallel int, action func(path string) (string,
 	return finalExitCode
 }
 
-// runAcross runs command in every matching repository.
-func runAcross(opts *options, command []string) int {
-	repos, cwd, err := findGitRepos(buildFilters(opts))
+// RunAcross runs command in every matching repository and returns the exit
+// code the process should finish with.
+func RunAcross(filters []filter.Filter, parallel int, quiet bool, command []string) int {
+	repos, cwd, err := findGitRepos(filters)
 	if err != nil {
 		fmt.Println(err)
 		return 1
 	}
 
-	return forEachRepo(repos, opts.parallel, func(path string) (string, int) {
-		return processRepo(path, cwd, command, opts.quiet)
+	return forEachRepo(repos, parallel, func(path string) (string, int) {
+		return processRepo(path, cwd, command, quiet)
 	})
 }
 
-// runStatus prints a branch status summary for every matching repository.
-func runStatus(opts *options) int {
-	repos, cwd, err := findGitRepos(buildFilters(opts))
+// RunStatus prints a branch status summary for every matching repository and
+// returns the exit code the process should finish with.
+func RunStatus(filters []filter.Filter, parallel int) int {
+	repos, cwd, err := findGitRepos(filters)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -233,7 +240,7 @@ func runStatus(opts *options) int {
 		}
 	}
 
-	return forEachRepo(repos, opts.parallel, func(path string) (string, int) {
+	return forEachRepo(repos, parallel, func(path string) (string, int) {
 		return statusRepo(path, cwd, longestName), 0
 	})
 }

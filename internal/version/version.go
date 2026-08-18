@@ -1,20 +1,23 @@
-package main
+// Package version reports the version that `gits version` prints.
+package version
 
 import (
 	"runtime/debug"
 	"strings"
 )
 
-// The version that `gits -version` reports.
+// The version that `gits version` reports.
 //
 // THE REPOSITORY HOLDS NO NUMBER. The release workflow stamps this variable
-// with `-ldflags "-X main.version=X.Y.Z"`, and the number comes from the tag
-// that the build builds. A build with no stamp asks the module system instead:
-// `go install github.com/stephenc/gits@vX.Y.Z` records the version of the
-// module, and a build from a checkout records the hash of the commit.
+// with `-ldflags "-X github.com/stephenc/gits/internal/version.version=X.Y.Z"`,
+// and the number comes from the tag that the build builds. A build with no
+// stamp asks the module system instead: `go install
+// github.com/stephenc/gits@vX.Y.Z` records the version of the module, and a
+// build from a checkout records the hash of the commit.
 var version = ""
 
-func versionString() string {
+// String returns the version to report.
+func String() string {
 	if version != "" {
 		return version
 	}

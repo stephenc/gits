@@ -1,14 +1,19 @@
-package main
+// Package cmd holds the cobra commands that make up the gits CLI.
+package cmd
 
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/spf13/cobra"
+
+	"github.com/stephenc/gits/internal/filter"
+	"github.com/stephenc/gits/internal/runner"
 )
 
-// errExit signals that main should exit with a non-zero code without cobra
+// errExit signals that Execute should exit with a non-zero code without cobra
 // printing an error message: the per-repo output already reports the failures.
 var errExit = errors.New("command failed in at least one repository")
 
@@ -29,6 +34,50 @@ type options struct {
 	quiet          bool
 	status         bool
 	version        bool
+}
+
+// filters assembles the filters selected by the command line options.
+func (opts *options) filters() []filter.Filter {
+	var filters []filter.Filter
+
+	if opts.branch != "" {
+		filters = append(filters, filter.Branch(opts.branch))
+	}
+	if opts.dirty {
+		filters = append(filters, filter.Dirty())
+	}
+	if opts.clean {
+		filters = append(filters, filter.Clean())
+	}
+	if opts.stash {
+		filters = append(filters, filter.Stash())
+	}
+	if opts.remote {
+		filters = append(filters, filter.HasRemote())
+	}
+	if opts.noRemote {
+		filters = append(filters, filter.NoRemote())
+	}
+	if opts.remoteContains != "" {
+		filters = append(filters, filter.RemoteContains(opts.remoteContains))
+	}
+	if opts.remoteHost != "" {
+		filters = append(filters, filter.RemoteHost(opts.remoteHost))
+	}
+	if opts.remoteName != "" {
+		filters = append(filters, filter.RemoteName(opts.remoteName))
+	}
+	if opts.nameContains != "" {
+		filters = append(filters, filter.NameContains(opts.nameContains))
+	}
+	if opts.nameStarts != "" {
+		filters = append(filters, filter.NameStarts(opts.nameStarts))
+	}
+	if opts.nameEnds != "" {
+		filters = append(filters, filter.NameEnds(opts.nameEnds))
+	}
+
+	return filters
 }
 
 func newRootCmd() *cobra.Command {
@@ -54,16 +103,13 @@ subcommand (completion, help, status, version), put it after "--":
 				return nil
 			}
 			if opts.status {
-				if runStatus(opts) != 0 {
-					return errExit
-				}
-				return nil
+				return runStatus(opts)
 			}
 			if len(args) == 0 {
 				_ = cmd.Usage()
 				return errors.New("no command provided")
 			}
-			if runAcross(opts, args) != 0 {
+			if runner.RunAcross(opts.filters(), opts.parallel, opts.quiet, args) != 0 {
 				return errExit
 			}
 			return nil
@@ -99,31 +145,12 @@ subcommand (completion, help, status, version), put it after "--":
 	return root
 }
 
-func newStatusCmd(opts *options) *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Display a summary of branch statuses",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if runStatus(opts) != 0 {
-				return errExit
-			}
-			return nil
-		},
+// Execute runs the gits CLI and exits the process with the appropriate code.
+func Execute() {
+	if err := newRootCmd().Execute(); err != nil {
+		if !errors.Is(err, errExit) {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+		}
+		os.Exit(1)
 	}
-}
-
-func newVersionCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "version",
-		Short: "Display the version",
-		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			printVersion()
-		},
-	}
-}
-
-func printVersion() {
-	fmt.Println("gits " + versionString())
 }
